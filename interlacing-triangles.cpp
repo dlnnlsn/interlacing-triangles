@@ -18,16 +18,20 @@ pair<int, int> find_move(
             return pair<int, int>{row, new_col};
         }
         else {
-            if (value_by_position[row + 1][new_col] > to_move) return pair<int, int>{row, new_col};
-            if (value_by_position[row + 1][new_col + 1] > to_move) return pair<int, int>{row, new_col}; 
+            if ((value_by_position[row + 1][new_col] > to_move)
+             != (value_by_position[row + 1][new_col + 1] > to_move)) {
+                return pair<int, int>{row, new_col};
+            }
         }
     }
 
     for (int new_row = row - 1; new_row >= 0; --new_row) {
         for (int new_col = new_row; new_col >= 0; --new_col) {
             if (value_by_position[new_row][new_col] > to_move) continue;
-            if (value_by_position[new_row + 1][new_col] > to_move) return pair<int, int>{new_row, new_col};
-            if (value_by_position[new_row + 1][new_col + 1] > to_move) return pair<int, int>{new_row, new_col};
+            if ((value_by_position[new_row + 1][new_col] > to_move)
+             != (value_by_position[new_row + 1][new_col + 1] > to_move)) {
+                return pair<int, int>{new_row, new_col};
+            }
         }
     }
 
@@ -106,14 +110,14 @@ int main() {
     }
 
     long long int num_triangles = 0;
-    if (valid(value_by_position)) ++num_triangles;
-
-    print_triangle(value_by_position);
+    if (valid(value_by_position)) {
+        ++num_triangles;
+    }
 
     while (next_candidate(n, value_by_position, position_by_value)) {
-        print_triangle(value_by_position);
-        cout << num_triangles << endl;
-        if (valid(value_by_position)) ++num_triangles;
+        if (valid(value_by_position)) {
+            ++num_triangles;
+        }
     }
 
     cout << "Number of triangles: " << num_triangles << endl;
