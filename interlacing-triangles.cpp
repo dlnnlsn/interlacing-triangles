@@ -79,6 +79,16 @@ bool valid(vector<vector<int>> candidate) {
     return true;
 }
 
+void print_triangle(const vector<vector<int>>& triangle) {
+    for (const auto& row : triangle) {
+        for (const auto& cell : row) {
+            cout << " " << cell;
+        }
+        cout << endl;
+    }
+    cout << endl;
+}
+
 int main() {
     cout << "Enter the number of rows in the triangle: ";
     int n; cin >> n;
@@ -98,7 +108,10 @@ int main() {
     long long int num_triangles = 0;
     if (valid(value_by_position)) ++num_triangles;
 
+    print_triangle(value_by_position);
+
     while (next_candidate(n, value_by_position, position_by_value)) {
+        print_triangle(value_by_position);
         cout << num_triangles << endl;
         if (valid(value_by_position)) ++num_triangles;
     }
