@@ -60,9 +60,9 @@ bool next_candidate(
     value_by_position[row][col] = to_move;
     position_by_value[to_move - 1] = pair<int, int>{row, col};
     for (int num = to_move - 1; num >= 1; --num) {
-        const auto [num_row, num_col] = positions[num];
+        const auto [num_row, num_col] = positions[num - 1];
         value_by_position[num_row][num_col] = num;
-        position_by_value[num - 1] = positions[num];
+        position_by_value[num - 1] = positions[num - 1];
     }
 
     return true;
