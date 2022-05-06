@@ -1,249 +1,178 @@
 #include <algorithm>
-#include <boost/multiprecision/cpp_int.hpp>
 #include <future>
 #include <iostream>
-#include <mutex>
-#include <tuple>
 #include <vector>
 
 using namespace std;
-using namespace boost::multiprecision;
-
-int factorials[11] = {1, 1, 2, 6, 24, 120, 720, 5040, 40320, 362880, 3628800};
-
-mutex output_mutex;
-
-void print_triangle(int128_t num_valid, int num_rows, int values[10][10]) {
-   output_mutex.lock();
-   cout << num_valid << endl;
-   for (int row = 0; row < num_rows; ++row) {
-        for (int col = 0; col <= row; ++col) {
-            cout << " " << values[row][col];
-        }
-        cout << endl;
-   } 
-   cout << endl;
-   output_mutex.unlock();
-}
 
 class interlacing_thread {
-    private:
-        int values[10][10];
-        pair<int, int> positions[100];
-        pair<int, int> latest_positions[100];
-        pair<int, int> earliest_positions[100];
-        int num_rows;
-        int max_num;
+private:
+    int values[10][10];
+    pair<int, int> positions[100];
+    int num_rows;
+    int max_num;
 
-        void update_latest_and_earliest_positions() {
-            this->latest_positions[0] = this->positions[0];
-            this->earliest_positions[0] = this->positions[0];
-            for (int num = 1; num <= this->max_num; ++num) {
-                this->latest_positions[num] = max(this->latest_positions[num - 1], this->positions[num]);
-                this->earliest_positions[num] = min(this->earliest_positions[num - 1], this->positions[num]);
+    void set_value(pair<int, int> position, int value) {
+        this->values[position.first][position.second] = value;
+        this->positions[value] = position;
+    }
+
+    void set_value(int row, int col, int value) {
+        this->values[row][col] = value;
+        this->positions[value] = pair<int, int>{row, col};
+    }
+
+    pair<int, int> find_move(int to_move) {
+        pair<int, int> max_pos{-1, -1};
+        pair<int, int> current_pos = this->positions[to_move];
+        for (int replaces = 2; replaces < to_move; ++replaces) {
+            pair<int, int> new_pos = this->positions[replaces];
+            if (new_pos > current_pos) continue;
+            if (new_pos.first == this->num_rows - 1) {
+                max_pos = max(max_pos, new_pos);
             }
-        }
-
-        pair<int, int> find_move(int to_move) {
-            pair<int, int> max_pos{-1, -1};
-
-            if (this->latest_positions[to_move].first == this->earliest_positions[to_move].first) {
-                return max_pos;
-            }
-
-            pair<int, int> neighbour_pos = this->positions[to_move + 1];
-            pair<int, int> current_pos = this->positions[to_move];
-
-            for (int replaces = 0; replaces < to_move; ++replaces) {
-                pair<int, int> new_pos = this->positions[replaces];
-                
-                if (new_pos.first == neighbour_pos.first) {
-                    if (new_pos.second > neighbour_pos.second - 2) {
-                        continue;
-                    }
-                }
-
-                if (new_pos > current_pos) continue;
-
-                if (new_pos.first == this->num_rows - 1) {
+            else {
+                if ((to_move >= this->values[new_pos.first + 1][new_pos.second])
+                 != (to_move >= this->values[new_pos.first + 1][new_pos.second + 1])) {
                     max_pos = max(max_pos, new_pos);
                 }
-                else {
-                    if ((to_move >= this->values[new_pos.first + 1][new_pos.second])
-                     != (to_move >= this->values[new_pos.first + 1][new_pos.second + 1])) {
-                        max_pos = max(max_pos, new_pos);
-                    }
-                }
             }
+        }
+        return max_pos;
+    }
 
-            return max_pos;
+    bool next_candidate() {
+        int to_move = -1;
+        pair<int, int> new_pos;
+        for (int candidate = 3; candidate <= this->max_num - 2; ++candidate) {
+            new_pos = this->find_move(candidate);
+            if (new_pos.first != -1) {
+                to_move = candidate;
+                break;
+            }
+        }
+        if (to_move == -1) return false;
+        
+        pair<int, int> positions[100];
+        int num_positions = 0;
+
+        for (int i = 2; i <= to_move; ++i) {
+            if (this->positions[i] == new_pos) continue;
+            positions[num_positions++] = this->positions[i];
+        }
+        sort(positions, positions + num_positions);
+
+        this->set_value(new_pos, to_move);
+        for (int num = 2; num < to_move; ++num) {
+            this->set_value(positions[num - 2], num);
         }
 
-        bool next_candidate() {
+        return true;
+    }
 
-            int to_move = -1;
-            pair<int, int> new_pos;
-            for (int candidate = 1; candidate < this->max_num - 1; ++candidate) {
-                new_pos = this->find_move(candidate);
-                if (new_pos.first != -1) {
-                    to_move = candidate;     
-                    break; 
+    bool valid() {
+        for (int row = 0; row < this->num_rows - 1; ++row) {
+            for (int col = 0; col <= row; ++col) {
+                if ((this->values[row][col] > this->values[row + 1][col])
+                 == (this->values[row][col] > this->values[row + 1][col + 1])) {
+                    return false;
                 }
             }
-            if (to_move == -1) return false;
-
-            pair<int, int> positions[100];
-            int num_positions = 0;
-
-            for (int i = 0; i <= to_move; ++i) {
-                if (this->positions[i] == new_pos) continue;
-                positions[num_positions++] = this->positions[i]; 
-            }
-            sort(positions, positions + num_positions);
-
-            this->set_value(new_pos, to_move);
-            
-            for (int num = to_move - 1; num >= 0; --num) {
-                this->set_value(positions[num], num);
-            }
-
-            if (this->positions[to_move - 1].first == new_pos.first) {
-                if (this->positions[to_move - 1].second > new_pos.second) {
-                    for (int num = to_move - 1; num >= 0; --num) {
-                        if (positions[num].first < new_pos.first) {
-                            this->set_value(positions[num], to_move - 1);
-                            for (int i = num + 1; i < to_move; ++i) {
-                                this->set_value(positions[i], i - 1);
-                            }
-                            break;
-                        }
-                    }
-                }
-            }
-
-            this->update_latest_and_earliest_positions();
-
-            return true;
         }
+        return true;
+    }
 
-        int128_t num_valid() {
-            for (int row = 0; row < this->num_rows - 1; ++row) {
-                for (int col = 0; col <= row; ++col) {
-                    if ((this->values[row][col] > this->values[row + 1][col])
-                     == (this->values[row][col] > this->values[row + 1][col + 1])) {
-                        return 0;
-                    }
-                }
+public:
+    interlacing_thread(int num_rows, pair<int, int> fixed_positions[4]) {
+        this->num_rows = num_rows;
+        const int max_num = (num_rows * (num_rows + 1)) / 2 - 1;
+        this->max_num = max_num;
+
+        int num = max_num;
+
+        this->set_value(fixed_positions[0], 0);
+        this->set_value(fixed_positions[1], 1);
+        this->set_value(fixed_positions[2], num--);
+        this->set_value(fixed_positions[3], num--);
+
+        sort(fixed_positions, fixed_positions + 4);
+
+        int fixed_index = 3;
+        pair<int, int> fixed_position = fixed_positions[fixed_index];
+
+        for (int row = num_rows - 1; row >= 0; --row) {
+            for (int col = row; col >= 0; --col) {
+                if (row == fixed_position.first && col == fixed_position.second) {
+                    --fixed_index;
+                    if (fixed_index >= 0) fixed_position = fixed_positions[fixed_index];
+                    continue;
+                }        
+                this->set_value(row, col, num--);
             }
-
-            int num_consecutive = 0;
-            int current_row = this->positions[this->max_num].first;
-            int128_t result = 1;
-
-            for (int num = this->max_num; num >= 0; --num) {
-                if (this->positions[num].first == current_row) ++num_consecutive;
-                else {
-                    current_row = this->positions[num].first;
-                    result = result * factorials[num_consecutive];
-                    num_consecutive = 1;
-                }
-            }
-
-            return result * factorials[num_consecutive];
         }
+    }
 
-        void set_value(pair<int, int> pos, int value) {
-            this->values[pos.first][pos.second] = value;
-            this->positions[value] = pos;
+    void operator()(promise<int64_t> result_promise) {
+        int64_t total = this->valid() ? 1 : 0;
+        while (this->next_candidate()) {
+            if (this->valid()) ++total;
         }
-
-        void set_value(int row, int col, int value) {
-            this->values[row][col] = value;
-            this->positions[value] = pair<int, int>{row, col};
-        }
-
-    public:
-        interlacing_thread(int num_rows, int max_pos, int second_row, int second_col) {
-
-            this->num_rows = num_rows;
-            const int max_num = (num_rows * (num_rows + 1)) / 2 - 1;
-            this->max_num = max_num;
-
-            int num = max_num;
-
-            this->set_value(num_rows - 1, max_pos, num--);
-            this->set_value(second_row, second_col, num--);
-
-            int start_row = num_rows - 1;
-            if (second_row == num_rows - 1) {
-                this->set_value(num_rows - 2, num_rows - 2, num--);
-                for (int col = num_rows - 1; col >= 0; --col) {
-                    if (col == max_pos) continue;
-                    if (col == second_col) continue;
-                    this->set_value(num_rows - 1, col, num--);
-                }
-                for (int col = num_rows - 3; col >= 0; --col) {
-                    this->set_value(num_rows - 2, col, num--);
-                }
-                start_row = num_rows - 3;
-            }
-
-            for (int row = start_row; row >= 0; --row) {
-                for (int col = row; col >= 0; --col) {
-                    if (row == num_rows - 1 && col == max_pos) continue;
-                    if (row == second_row && col == second_col) continue;        
-                    this->set_value(row, col, num--);
-                }
-            }
-
-            this->update_latest_and_earliest_positions();
-        }
-
-        void operator()(promise<int128_t> result_promise) {
-            int128_t total = this->num_valid();
-            //print_triangle(this->num_valid(), this->num_rows, this->values);
-            while (this->next_candidate()) {
-                //print_triangle(this->num_valid(), this->num_rows, this->values);
-                total += this->num_valid();
-            }
-            result_promise.set_value(total);
-        }
+        result_promise.set_value(total);
+    }
 };
 
 int main() {
     cout << "Enter the number of rows in the triangle: ";
     int n; cin >> n;
 
-    vector<future<int128_t>> futures;
+    vector<future<int64_t>> futures;
     vector<thread> threads;
+    vector<int> multipliers;
+    
+    for (int min_col = 0; min_col < n; ++min_col) {
+        for (int max_col = 0; max_col < n; ++max_col) {
+            if (max_col == min_col) continue;
+            for (int low_type = 0; low_type < 2; ++low_type) {
+                int low_start_col = low_type == 0 ? 0 : max(min_col - 1, 0);
+                int low_end_col = low_type == 0 ? min_col - 2 : min(min_col, n - 2);
+                for (int low_col = low_start_col; low_col <= low_end_col; ++low_col) {
+                    if (low_type == 0 && low_col == min_col) continue;
+                    if (low_type == 0 && low_col == max_col) continue;
+                    for (int high_type = 0; high_type < 2; ++high_type) {
+                        int high_start_col = high_type == 0 ? 0 : max(max_col - 1, 0);
+                        int high_end_col = high_type == 0 ? max_col - 2 : min(max_col, n - 2);
+                        for (int high_col = high_start_col; high_col <= high_end_col; ++high_col) {
+                            if (high_type == 0 && high_col == min_col) continue;
+                            if (high_type == 0 && high_col == max_col) continue;
+                            if (high_type == low_type && high_col == low_col) continue;
+                            pair<int, int> fixed_positions[] = {
+                                pair<int, int>{n - 1, min_col},
+                                pair<int, int>{n - 1 - low_type, low_col},
+                                pair<int, int>{n - 1, max_col},
+                                pair<int, int>{n - 1 - high_type, high_col}
+                            };
 
-    for (int max_pos = 0; max_pos < n; ++max_pos) {
-        for (int second_col = 0; second_col < max_pos - 1; ++second_col) {
-            promise<int128_t> instance_promise;
-            futures.push_back(instance_promise.get_future());
-            threads.push_back(thread(interlacing_thread(n, max_pos, n - 1, second_col), move(instance_promise)));
-        }
-        
-        if (max_pos < n - 1) {
-            promise<int128_t> left_promise;
-            futures.push_back(left_promise.get_future());
-            threads.push_back(thread(interlacing_thread(n, max_pos, n - 2, max_pos), move(left_promise)));
-        }
-
-        if (max_pos > 0) {
-            promise<int128_t> right_promise;
-            futures.push_back(right_promise.get_future());
-            threads.push_back(thread(interlacing_thread(n, max_pos, n - 2, max_pos - 1), move(right_promise)));
+                            int multiplier = 1;
+                            if (low_type == 0) multiplier *= 2;
+                            if (high_type == 0) multiplier *= 2;
+                            multipliers.push_back(multiplier);
+                            
+                            promise<int64_t> instance_promise;
+                            futures.push_back(instance_promise.get_future());
+                            threads.push_back(thread(interlacing_thread(n, fixed_positions), move(instance_promise)));
+                        }
+                    }
+                }
+            }
         }
     }
 
-    int128_t num_triangles = 0;
-
+    int64_t num_triangles = 0;
+    
     for (int i = 0; i < threads.size(); ++i) {
-        num_triangles += futures[i].get();
+        num_triangles += multipliers[i] * futures[i].get();
         threads[i].join();
     }
 
     cout << "Number of triangles: " << num_triangles << endl;
-
 }
