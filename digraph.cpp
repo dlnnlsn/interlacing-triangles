@@ -12,7 +12,7 @@ using namespace std;
 const int max_threads = max<int>(thread::hardware_concurrency(), 1);
 atomic<int> num_threads;
 
-constexpr int min_batch_size = 1;
+constexpr int min_batch_size = 4;
 
 constexpr int digraph_index(int row, int col) {
     return (row * (row + 1)) / 2 + col;
