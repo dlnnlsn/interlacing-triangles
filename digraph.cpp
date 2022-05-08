@@ -139,7 +139,7 @@ int main() {
 
     int num_rows; cin >> num_rows;
 
-    uint64_t end = 1ull << (num_rows * (num_rows - 1)) / 2;
+    uint64_t end = 1ull << (num_rows * (num_rows - 1)) / 2 - 1;
     uint64_t block_size = max<uint64_t>(end / num_threads, 1);
 
     vector<future<int128_t>> futures;
@@ -157,7 +157,7 @@ int main() {
         threads[i].join();
     }
 
-    cout << triangles << endl;
+    cout << (2 * triangles) << endl;
 
     return 0;
 }
