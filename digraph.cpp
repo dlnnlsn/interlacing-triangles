@@ -62,10 +62,9 @@ bool find_linear_extension(int num_rows, uint64_t digraph, int num_visited, bool
     return false;
 }
 
-int128_t sage_count_linear_extensions(int num_rows, uint64_t digraph) {
+bool find_linear_extension(int num_rows, uint64_t digraph, int linear_extension[MAX_ROWS * MAX_ROWS]) {
     int in_degree[MAX_ROWS][MAX_ROWS];
     bool visited[MAX_ROWS][MAX_ROWS];
-    int linear_extension[MAX_ROWS * MAX_ROWS];
 
     for (int row = 0; row < num_rows; ++row) {
         for (int col = 0; col <= row; ++col) {
@@ -79,8 +78,13 @@ int128_t sage_count_linear_extensions(int num_rows, uint64_t digraph) {
             update_indegrees(num_rows, row, col, true, digraph, in_degree);
         }
     }
+    
+    return find_linear_extension(num_rows, digraph, 0, visited, in_degree, linear_extension);
+}
 
-    if (!find_linear_extension(num_rows, digraph, 0, visited, in_degree, linear_extension)) {
+int128_t sage_count_linear_extensions(int num_rows, uint64_t digraph) {
+    int linear_extension[MAX_ROWS * MAX_ROWS];
+    if (!find_linear_extension(num_rows, digraph, linear_extension)) {
         return 0;
     }
 
@@ -156,71 +160,6 @@ int128_t sage_count_linear_extensions(int num_rows, uint64_t digraph) {
         Jup_ct[m] = ct;
     }
     return ct;
-}
-
-
-bool has_any_topological_orders(int num_rows, uint64_t digraph, int left_to_visit, bool visited[MAX_ROWS][MAX_ROWS], int in_degree[MAX_ROWS][MAX_ROWS]) {
-    if (left_to_visit == 0) return true;
-
-    for (int row = 0; row < num_rows; ++row) {
-        for (int col = 0; col <= row; ++col) {
-            if (visited[row][col]) continue;
-            if (in_degree[row][col] > 0) continue;
-
-            visited[row][col] = true;
-            update_indegrees(num_rows, row, col, false, digraph, in_degree);
-            bool result = has_any_topological_orders(num_rows, digraph, left_to_visit - 1, visited, in_degree);
-            update_indegrees(num_rows, row, col, true, digraph, in_degree);
-            visited[row][col] = false;
-            return result; 
-        }
-    }
-    return false;
-}
-
-int128_t count(int num_rows, uint64_t digraph, int left_to_visit, bool visited[MAX_ROWS][MAX_ROWS], int in_degree[MAX_ROWS][MAX_ROWS]) {
-    if (left_to_visit == 0) {
-        return 1;
-    }
-    int128_t total = 0;
-    for (int row = 0; row < num_rows; ++row) {
-        for (int col = 0; col <= row; ++col) {
-            if (visited[row][col]) continue;
-            if (in_degree[row][col] > 0) continue;
-
-            visited[row][col] = true;
-            update_indegrees(num_rows, row, col, false, digraph, in_degree);
-
-            total += count(num_rows, digraph, left_to_visit - 1, visited, in_degree);
-
-            update_indegrees(num_rows, row, col, true, digraph, in_degree);
-            visited[row][col] = false;
-        }
-    }
-
-    return total;
-}
-
-int128_t count(int num_rows, uint64_t digraph) {
-    bool visited[MAX_ROWS][MAX_ROWS];
-    int in_degree[MAX_ROWS][MAX_ROWS];
-    for (int row = 0; row < num_rows; ++row) {
-        for (int col = 0; col <= row; ++col) {
-            visited[row][col] = false;
-            in_degree[row][col] = 0;
-        }
-    }
-
-    for (int row = 0; row < num_rows; ++row) {
-        for (int col = 0; col <= row; ++col) {
-            update_indegrees(num_rows, row, col, true, digraph, in_degree);
-        }
-    }
-
-    if (!has_any_topological_orders(num_rows, digraph, (num_rows * (num_rows + 1)) / 2, visited, in_degree)) {
-        return 0;
-    }
-    return count(num_rows, digraph, (num_rows * (num_rows + 1)) / 2, visited, in_degree);
 }
 
 void digraph_thread(int num_rows, uint64_t start, uint64_t end, promise<int128_t> result_promise) {
