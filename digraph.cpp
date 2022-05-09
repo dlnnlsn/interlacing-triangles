@@ -12,8 +12,9 @@
 using namespace boost::multiprecision;
 using namespace std;
 
-//const int max_threads = max<int>(thread::hardware_concurrency(), 1);
-constexpr int max_threads = 16;
+constexpr int min_batch_size = 4;
+const int max_threads = max<int>(thread::hardware_concurrency(), 1);
+atomic<int> num_threads;
 
 constexpr int digraph_index(int row, int col) {
     return (row * (row + 1)) / 2 + col;
@@ -221,13 +222,37 @@ int128_t count(int num_rows, uint64_t digraph) {
 }
 
 void digraph_thread(int num_rows, uint64_t start, uint64_t end, promise<int128_t> result_promise) {
+    num_threads++;
     int128_t total = 0;
 
     for (uint64_t digraph = start; digraph < end; ++digraph) {
-        total += sage_count_linear_extensions(num_rows, digraph);
+        if (end - digraph >= 2 * min_batch_size && num_threads < max_threads) {
+            promise<int128_t> left_promise;
+            promise<int128_t> right_promise;
+
+            future<int128_t> left_future = left_promise.get_future();
+            future<int128_t> right_future = right_promise.get_future();
+
+            uint64_t midpoint = (digraph + end) / 2;
+
+            num_threads--;
+            thread left_thread = thread(digraph_thread, num_rows, digraph, midpoint, move(left_promise));
+            thread right_thread = thread(digraph_thread, num_rows, midpoint, end, move(right_promise));
+
+            total += left_future.get();
+            total += right_future.get();
+
+            left_thread.join();
+            right_thread.join();
+
+            result_promise.set_value(total);
+            return;
+        }
+        total += sage_count_linear_extensions(num_rows, digraph);   
     }
 
     result_promise.set_value(total);
+    num_threads--;
 }
 
 int main() {
@@ -235,25 +260,15 @@ int main() {
     int num_rows; cin >> num_rows;
 
     uint64_t end = 1ull << ((num_rows * (num_rows - 1)) / 2 - 1);
-    uint64_t block_size = max<uint64_t>(end / max_threads, 1);
 
-    vector<future<int128_t>> futures;
-    vector<thread> threads;
+    num_threads = 0;
 
-    for (uint64_t start = 0; start < end; start += block_size) {
-        promise<int128_t> result_promise;
-        futures.push_back(result_promise.get_future());
-        threads.push_back(thread(digraph_thread, num_rows, start, min<uint64_t>(start + block_size, end), move(result_promise)));
-    }
+    promise<int128_t> result_promise;
+    future<int128_t> result_future = result_promise.get_future();
+    thread computation_thread(digraph_thread, num_rows, 0, end, move(result_promise));
 
-    int128_t triangles = 0;
-
-    for (int i = 0; i < futures.size(); ++i) {
-        triangles += futures[i].get();
-        threads[i].join(); 
-    }
-
-    triangles *= 2;
+    int128_t triangles = 2 * result_future.get();
+    computation_thread.join();
 
     cout << triangles << endl;
 
