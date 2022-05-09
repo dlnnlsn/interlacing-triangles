@@ -9,6 +9,8 @@
 #include <unordered_set>
 #include <vector>
 
+#define MAX_ROWS 10
+
 using namespace boost::multiprecision;
 using namespace std;
 
@@ -20,7 +22,7 @@ constexpr int digraph_index(int row, int col) {
     return (row * (row + 1)) / 2 + col;
 }
 
-void update_indegrees(int num_rows, int row, int col, bool increment, uint64_t digraph, int in_degree[10][10]) {
+void update_indegrees(int num_rows, int row, int col, bool increment, uint64_t digraph, int in_degree[MAX_ROWS][MAX_ROWS]) {
     int to_add = increment ? 1 : -1;
     if (row < num_rows - 1) {
         if (digraph & (1 << digraph_index(row, col))) {
@@ -44,7 +46,7 @@ void update_indegrees(int num_rows, int row, int col, bool increment, uint64_t d
     }
 }
 
-bool find_linear_extension(int num_rows, uint64_t digraph, int num_visited, bool visited[10][10], int in_degree[10][10], int linear_extension[100]) {
+bool find_linear_extension(int num_rows, uint64_t digraph, int num_visited, bool visited[MAX_ROWS][MAX_ROWS], int in_degree[MAX_ROWS][MAX_ROWS], int linear_extension[MAX_ROWS * MAX_ROWS]) {
     if (num_visited == ((num_rows * (num_rows + 1)) / 2)) return true;
     for (int row = 0; row < num_rows; ++row) {
         for (int col = 0; col <= row; ++col) {
@@ -61,9 +63,9 @@ bool find_linear_extension(int num_rows, uint64_t digraph, int num_visited, bool
 }
 
 int128_t sage_count_linear_extensions(int num_rows, uint64_t digraph) {
-    int in_degree[10][10];
-    bool visited[10][10];
-    int linear_extension[100];
+    int in_degree[MAX_ROWS][MAX_ROWS];
+    bool visited[MAX_ROWS][MAX_ROWS];
+    int linear_extension[MAX_ROWS * MAX_ROWS];
 
     for (int row = 0; row < num_rows; ++row) {
         for (int col = 0; col <= row; ++col) {
@@ -157,7 +159,7 @@ int128_t sage_count_linear_extensions(int num_rows, uint64_t digraph) {
 }
 
 
-bool has_any_topological_orders(int num_rows, uint64_t digraph, int left_to_visit, bool visited[10][10], int in_degree[10][10]) {
+bool has_any_topological_orders(int num_rows, uint64_t digraph, int left_to_visit, bool visited[MAX_ROWS][MAX_ROWS], int in_degree[MAX_ROWS][MAX_ROWS]) {
     if (left_to_visit == 0) return true;
 
     for (int row = 0; row < num_rows; ++row) {
@@ -176,7 +178,7 @@ bool has_any_topological_orders(int num_rows, uint64_t digraph, int left_to_visi
     return false;
 }
 
-int128_t count(int num_rows, uint64_t digraph, int left_to_visit, bool visited[10][10], int in_degree[10][10]) {
+int128_t count(int num_rows, uint64_t digraph, int left_to_visit, bool visited[MAX_ROWS][MAX_ROWS], int in_degree[MAX_ROWS][MAX_ROWS]) {
     if (left_to_visit == 0) {
         return 1;
     }
@@ -200,8 +202,8 @@ int128_t count(int num_rows, uint64_t digraph, int left_to_visit, bool visited[1
 }
 
 int128_t count(int num_rows, uint64_t digraph) {
-    bool visited[10][10];
-    int in_degree[10][10];
+    bool visited[MAX_ROWS][MAX_ROWS];
+    int in_degree[MAX_ROWS][MAX_ROWS];
     for (int row = 0; row < num_rows; ++row) {
         for (int col = 0; col <= row; ++col) {
             visited[row][col] = false;
@@ -258,6 +260,11 @@ void digraph_thread(int num_rows, uint64_t start, uint64_t end, promise<int128_t
 int main() {
 
     int num_rows; cin >> num_rows;
+
+    if (num_rows > MAX_ROWS) {
+        cout << "Maximum number of rows supported: " << MAX_ROWS << endl;
+        return 1;
+    }
 
     uint64_t end = 1ull << ((num_rows * (num_rows - 1)) / 2 - 1);
 
