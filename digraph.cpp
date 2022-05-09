@@ -5,7 +5,6 @@
 #include <iostream>
 #include <set>
 #include <thread>
-#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -114,11 +113,8 @@ int128_t sage_count_linear_extensions(int num_rows, uint64_t digraph) {
         up[i] = vector<int>(new_up.begin(), new_up.end());
     }
 
-    unordered_map<int, vector<int>> Jup;
-    Jup[1] = vector<int>{};
-
+    vector<vector<int>> Jup{{}, {}};
     vector<int> loc(n, 1);
-
     int m = 1;
 
     for (int x = 0; x < n; ++x) {
@@ -140,7 +136,7 @@ int128_t sage_count_linear_extensions(int num_rows, uint64_t digraph) {
             for (const int a : Jup[flat_k[j]]) {
                 jup_i.push_back(m + lower_bound(flat_k.begin(), flat_k.end(), a) - flat_k.begin() + 1);
             }
-            Jup[i] = jup_i;
+            Jup.push_back(jup_i);
             Jup[flat_k[j]].push_back(i);
         }
         for (const int y : up[x]) {
@@ -149,7 +145,7 @@ int128_t sage_count_linear_extensions(int num_rows, uint64_t digraph) {
         m += flat_k.size();
     }
     int128_t ct = 0;
-    unordered_map<int, int128_t> Jup_ct;
+    vector<int128_t> Jup_ct(m + 1, 0);
     Jup_ct[m] = 1;
     while (m > 1) {
         m -= 1;
